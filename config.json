@@ -1,0 +1,14 @@
+{
+    "server": {
+        "port": "1234",
+        "restrict_to": [
+            "google.com:443"
+        ],
+        "dns_resolvers": [
+            "dns://1.1.1.1"
+        ],
+        "ws_url": "wss://0.0.0.0:52673",
+        "log_level": "INFO"
+    },
+    "client": {}
+}
