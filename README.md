@@ -60,11 +60,11 @@ Um die GUI zu verwenden, müssen sowohl das `wstunnel`-Tool als auch die für un
     ```
 
 2.  **Abhängigkeiten installieren:**
-    Unsere Anwendung benötigt `PyQt5`. Installieren Sie es mit pip:
+    Unsere Anwendung benötigt `PyQt6`. Installieren Sie es mit pip:
     ```bash
     pip install -r requirements.txt
     ```
-    *(Hinweis: Erstellen Sie eine `requirements.txt`-Datei im Hauptverzeichnis Ihres Projekts mit dem Inhalt `PyQt5`)*
+    *(Hinweis: Erstellen Sie eine `requirements.txt`-Datei im Hauptverzeichnis Ihres Projekts mit dem Inhalt `PyQt6`)*
 
 ## Nutzung
 
