@@ -8,14 +8,15 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QGroupBox, QLineEdit, QFormLayout,
     QMenuBar, QFileDialog, QMessageBox, QTabWidget, QCheckBox,
-    QListWidget, QComboBox
+    QListWidget, QComboBox, QScrollArea, QSizePolicy, QTextEdit
 )
 
 class WstunnelGUIApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Wstunnel GUI")
-        self.setFixedSize(800, 600)
+        # Removed fixed size to allow resizing
+        self.setMinimumSize(800, 600)  # Set minimum size instead
 
         self.current_file = None
         self.connection_active = False
@@ -26,9 +27,17 @@ class WstunnelGUIApp(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
 
+        # Create a scroll area for the tab widget
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
         # Create tab widget for configuration
         self.tab_widget = QTabWidget()
-        main_layout.addWidget(self.tab_widget)
+        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        # Set the tab widget as the scroll area's widget
+        scroll_area.setWidget(self.tab_widget)
+        main_layout.addWidget(scroll_area, 1)  # Add stretch factor to make it resizable
 
         # Create server and client tabs
         self.create_server_tab()
@@ -36,19 +45,41 @@ class WstunnelGUIApp(QMainWindow):
 
         # Status and activation panel at the bottom
         status_panel = QGroupBox("Connection Status")
-        status_layout = QHBoxLayout(status_panel)
+        status_layout = QVBoxLayout(status_panel)  # Changed to VBox for better layout
 
+        # Top row with status and button
+        top_row = QWidget()
+        top_row_layout = QHBoxLayout(top_row)
+        
         # Connection status
         self.status_label = QLabel("Not connected!")
         self.status_label.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
-
+        
         # Activate button
         self.activate_button = QPushButton("Activate")
         self.activate_button.setStyleSheet("font-size: 14px;")
         self.activate_button.clicked.connect(self.toggle_connection)
 
-        status_layout.addWidget(self.status_label, 1)
-        status_layout.addWidget(self.activate_button)
+        top_row_layout.addWidget(self.status_label, 1)
+        top_row_layout.addWidget(self.activate_button)
+        status_layout.addWidget(top_row)
+
+        # Output console for command line stdout
+        self.output_console = QTextEdit()
+        self.output_console.setReadOnly(True)
+        self.output_console.setStyleSheet("""
+            QTextEdit {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                font-family: monospace;
+                min-height: 100px;
+            }
+        """)
+        self.output_console.setSizePolicy(
+            QSizePolicy.Policy.Expanding, 
+            QSizePolicy.Policy.Expanding
+        )
+        status_layout.addWidget(self.output_console, 1)  # Add stretch factor
 
         main_layout.addWidget(status_panel)
 
@@ -56,10 +87,15 @@ class WstunnelGUIApp(QMainWindow):
         self.wstunnel_executable = None
 
     def create_server_tab(self):
-        """Create the server configuration tab"""
-        server_tab = QWidget()
-        server_layout = QFormLayout(server_tab)
 
+        server_tab = QWidget()
+        server_scroll = QScrollArea()
+        server_scroll.setWidgetResizable(True)
+        
+        server_content = QWidget()
+        server_layout = QFormLayout(server_content)
+        
+        
         # Add server parameters
         # 1. Server Address (ws[s]://0.0.0.0[:port])
         self.server_address = QLineEdit()
@@ -115,7 +151,7 @@ class WstunnelGUIApp(QMainWindow):
         self.restrict_to_input.setValidator(QRegularExpressionValidator(rx_restrict))
         self.restrict_to_input.setPlaceholderText("e.g., google.com:443")
         add_restrict_btn = QPushButton("Add")
-        add_restrict_btn.clicked.connect(self.add_restrict_to)
+        #add_restrict_btn.clicked.connect(self.add_restrict_to)
         remove_restrict_btn = QPushButton("Remove")
         remove_restrict_btn.clicked.connect(lambda: self.restrict_to_list.takeItem(self.restrict_to_list.currentRow()))
         restrict_layout = QHBoxLayout()
@@ -133,7 +169,7 @@ class WstunnelGUIApp(QMainWindow):
         self.dns_resolver_input.setValidator(QRegularExpressionValidator(rx_dns))
         self.dns_resolver_input.setPlaceholderText("e.g., dns://1.1.1.1")
         add_dns_btn = QPushButton("Add")
-        add_dns_btn.clicked.connect(self.add_dns_resolver)
+        #add_dns_btn.clicked.connect(self.add_dns_resolver)
         remove_dns_btn = QPushButton("Remove")
         remove_dns_btn.clicked.connect(lambda: self.dns_resolver_list.takeItem(self.dns_resolver_list.currentRow()))
         dns_layout = QHBoxLayout()
@@ -227,12 +263,71 @@ class WstunnelGUIApp(QMainWindow):
         self.proxy_password.editingFinished.connect(lambda: self.config_changed(self.proxy_password))
         server_layout.addRow("HTTP Proxy Password:", self.proxy_password)
 
+        # Set the content widget
+        server_scroll.setWidget(server_content)
+        
+        # Create a layout for the tab and add the scroll area
+        tab_layout = QVBoxLayout(server_tab)
+        tab_layout.addWidget(server_scroll)
+
         self.tab_widget.addTab(server_tab, "Server")
 
+    def add_restrict_to(self):
+        """Add restrict-to entry to the list"""
+        restrict_text = self.restrict_to_input.text()
+        if restrict_text:
+            self.restrict_to_list.addItem(restrict_text)
+            self.restrict_to_input.clear()
+            self.config_dic["server"]["restrict_to"] = [
+                self.restrict_to_list.item(i).text() for i in range(self.restrict_to_list.count())
+            ]
+
+    def add_dns_resolver(self):
+        """Add DNS resolver entry to the list"""
+        dns_text = self.dns_resolver_input.text()
+        if dns_text:
+            self.dns_resolver_list.addItem(dns_text)
+            self.dns_resolver_input.clear()
+            self.config_dic["server"]["dns_resolvers"] = [
+                self.dns_resolver_list.item(i).text() for i in range(self.dns_resolver_list.count())
+            ]
+
+    def browse_restrict_config(self):
+        """Browse for restrict config file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Restrict Config File", "", "YAML Files (.yaml);;All Files ()")
+        if file_path:
+            self.restrict_config.setText(file_path)
+            self.config_changed(self.restrict_config)
+
+    def browse_tls_cert(self):
+        """Browse for TLS certificate file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select TLS Certificate File", "", "PEM Files (.pem);;All Files ()")
+        if file_path:
+            self.tls_cert.setText(file_path)
+            self.config_changed(self.tls_cert)
+
+    def browse_tls_key(self):
+        """Browse for TLS private key file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select TLS Private Key File", "", "PEM Files (.pem);;All Files ()")
+        if file_path:
+            self.tls_key.setText(file_path)
+            self.config_changed(self.tls_key)
+
+    def browse_tls_ca_certs(self):
+        """Browse for TLS CA certificates file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select TLS CA Certificates File", "", "PEM Files (.pem);;All Files ()")
+        if file_path:
+            self.tls_ca_certs.setText(file_path)
+            self.config_changed(self.tls_ca_certs)
+
     def create_client_tab(self):
-        """Create the client configuration tab"""
+        """Create the client configuration tab with scrollable content"""
         client_tab = QWidget()
-        client_layout = QFormLayout(client_tab)
+        client_scroll = QScrollArea()
+        client_scroll.setWidgetResizable(True)
+        
+        client_content = QWidget()
+        client_layout = QFormLayout(client_content)
 
         # WebSocket URL
         self.ws_url_input = QLineEdit()
@@ -259,7 +354,14 @@ class WstunnelGUIApp(QMainWindow):
         client_layout.addRow(QLabel("Proxy (e.g. socks5://127.0.0.1:9050):"), self.proxy_input)
         self.proxy_input.editingFinished.connect(lambda: self.config_changed(self.proxy_input))
 
+        client_scroll.setWidget(client_content)
+        
+        # Create a layout for the tab and add the scroll area
+        tab_layout = QVBoxLayout(client_tab)
+        tab_layout.addWidget(client_scroll)
+        
         self.tab_widget.addTab(client_tab, "Client")
+
 
     def config_changed(self, widget):
         if widget == self.ws_url_input:
@@ -272,8 +374,6 @@ class WstunnelGUIApp(QMainWindow):
             self.config_dic["client"]["ignore_cert"] = widget.isChecked()
         elif widget == self.proxy_input:
             self.config_dic["client"]["proxy"] = widget.text()
-        elif widget == self.client_port_number:
-            self.config_dic["client"]["port"] = widget.text()
         elif widget == self.server_port_number:
             self.config_dic["server"]["port"] = widget.text()
 
