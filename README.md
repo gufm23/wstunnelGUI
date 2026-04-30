@@ -72,3 +72,5 @@ Nach der erfolgreichen Installation können Sie die Anwendung starten:
 
 ```bash
 python main.py
+
+
